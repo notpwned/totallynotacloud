@@ -9,7 +9,7 @@ struct AppColors {
     static let textSecondary = Color(white: 0.5)
     static let textTertiary = Color(white: 0.35)
     
-    static let accent = Color.white
+    static let accent = Color.blue
     static let accentDim = Color(white: 0.8)
     
     static let divider = Color(white: 0.15)
