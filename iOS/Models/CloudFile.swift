@@ -1,6 +1,5 @@
 import Foundation
 
-/// Модель файла в облачном хранилище
 struct CloudFile: Identifiable, Codable {
     let id: String
     var name: String
@@ -9,9 +8,9 @@ struct CloudFile: Identifiable, Codable {
     let uploadedAt: Date
     var updatedAt: Date
     var isDirectory: Bool = false
+    var accessKeyHash: String
     var parentId: String?
     
-    /// Форматированный размер файла
     var formattedSize: String {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useAll]
@@ -19,7 +18,6 @@ struct CloudFile: Identifiable, Codable {
         return formatter.string(fromByteCount: size)
     }
     
-    /// Иконка в зависимости от типа файла
     var fileIcon: String {
         if isDirectory {
             return "folder.fill"
@@ -44,19 +42,26 @@ struct CloudFile: Identifiable, Codable {
     }
 }
 
-/// Модель для ответа от сервера при загрузке файла
 struct UploadResponse: Codable {
     let id: String
     let name: String
     let size: Int64
-    let url: String
+    let accessKeyHash: String
 }
 
-/// Модель для отслеживания статуса загрузки
 struct UploadProgress: Identifiable {
     let id: String = UUID().uuidString
     let fileName: String
     var progress: Double = 0.0
     var isComplete: Bool = false
     var error: String?
+}
+
+struct AccessKey: Codable {
+    let keyId: String
+    let publicKey: String
+    let privateKey: String
+    let createdAt: Date
+    var expiresAt: Date?
+    var permissions: [String] = []
 }
