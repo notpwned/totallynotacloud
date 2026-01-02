@@ -1,216 +1,150 @@
 import SwiftUI
 
 struct AuthView: View {
-    @EnvironmentObject var authService: AuthService
-    @State private var isLogin = true
+    @StateObject private var viewModel = AccessKeyViewModel()
+    @State private var showQRCode = false
+    @State private var showQRScanner = false
+    @State private var generatedKey: AccessKey?
+    @State private var generatedQRString = ""
     
     var body: some View {
         ZStack {
-            AppColors.background
-                .ignoresSafeArea()
+            AppColors.background.ignoresSafeArea()
             
-            VStack(spacing: 0) {
+            VStack(spacing: 32) {
                 VStack(spacing: 12) {
-                    Image(systemName: "cloud.fill")
-                        .font(.system(size: 48))
-                        .foregroundColor(AppColors.accentBlue)
-                    
-                    Text("totallynotacloud")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(AppColors.textPrimary)
-                    
-                    Text("Облачное хранилище нового поколения")
-                        .font(.system(size: 14, weight: .regular))
-                        .foregroundColor(AppColors.textSecondary)
-                }
-                .padding(.top, 40)
-                .padding(.bottom, 50)
-                
-                if isLogin {
-                    LoginFormView()
-                } else {
-                    RegisterFormView()
+                    Text("totallynotacloud").font(.system(size: 28, weight: .bold)).foregroundColor(AppColors.textPrimary)
+                    Text("Private. Encrypted. Yours.").font(.system(size: 13, weight: .regular)).foregroundColor(AppColors.textSecondary)
                 }
                 
                 Spacer()
                 
-                HStack(spacing: 0) {
-                    Text(isLogin ? "Нет аккаунта? " : "Уже есть аккаунт? ")
-                        .foregroundColor(AppColors.textSecondary)
+                VStack(spacing: 16) {
+                    Button(action: { Task { await viewModel.generateAccessKey() } }) {
+                        HStack {
+                            Image(systemName: "key.fill").font(.system(size: 16))
+                            Text("Generate Access Key")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(AppColors.accent)
+                        .foregroundColor(AppColors.background)
+                        .font(.system(size: 14, weight: .semibold))
+                        .cornerRadius(8)
+                    }
                     
-                    Button(isLogin ? "Зарегистрироваться" : "Войти") {
-                        withAnimation {
-                            isLogin.toggle()
+                    Button(action: { showQRScanner = true }) {
+                        HStack {
+                            Image(systemName: "qrcode.viewfinder").font(.system(size: 16))
+                            Text("Scan Access Key")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(AppColors.surfaceLight)
+                        .foregroundColor(AppColors.textPrimary)
+                        .font(.system(size: 14, weight: .semibold))
+                        .cornerRadius(8)
+                    }
+                }
+                .padding(.horizontal, 24)
+                
+                Spacer()
+                
+                VStack(spacing: 8) {
+                    Text("Your privacy is guaranteed.").font(.system(size: 12, weight: .regular)).foregroundColor(AppColors.textTertiary)
+                    Text("No accounts. No tracking. No data stored.").font(.system(size: 12, weight: .regular)).foregroundColor(AppColors.textTertiary)
+                }
+            }
+            .padding(.vertical, 48)
+            
+            if let key = viewModel.generatedKey {
+                VStack(spacing: 24) {
+                    VStack(spacing: 16) {
+                        Text("Your Access Key").font(.system(size: 18, weight: .semibold)).foregroundColor(AppColors.textPrimary)
+                        
+                        VStack(spacing: 12) {
+                            Text("Key ID:").font(.system(size: 12, weight: .semibold)).foregroundColor(AppColors.textSecondary).frame(maxWidth: .infinity, alignment: .leading)
+                            Text(key.keyId).font(.system(size: 11, weight: .regular, design: .monospaced)).foregroundColor(AppColors.textPrimary).frame(maxWidth: .infinity, alignment: .leading).padding(8).background(AppColors.surface).cornerRadius(6)
+                            
+                            Button(action: { UIPasteboard.general.string = key.keyId }) {
+                                HStack {
+                                    Image(systemName: "doc.on.doc").font(.system(size: 12))
+                                    Text("Copy")
+                                }
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundColor(AppColors.textPrimary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                        }
+                        
+                        VStack(spacing: 12) {
+                            Text("Save your private key securely:").font(.system(size: 12, weight: .semibold)).foregroundColor(AppColors.textSecondary).frame(maxWidth: .infinity, alignment: .leading)
+                            Text(key.privateKey).font(.system(size: 10, weight: .regular, design: .monospaced)).foregroundColor(AppColors.textPrimary).lineLimit(3).frame(maxWidth: .infinity, alignment: .leading).padding(8).background(AppColors.surface).cornerRadius(6)
+                            
+                            Button(action: { UIPasteboard.general.string = key.privateKey }) {
+                                HStack {
+                                    Image(systemName: "doc.on.doc").font(.system(size: 12))
+                                    Text("Copy")
+                                }
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundColor(AppColors.textPrimary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .trailing)
                         }
                     }
-                    .foregroundColor(AppColors.accentBlue)
-                    .font(.system(size: 14, weight: .semibold))
+                    .padding(16)
+                    .background(AppColors.surface)
+                    .cornerRadius(12)
+                    
+                    Button(action: { viewModel.confirmAccessKey() }) {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill").font(.system(size: 16))
+                            Text("Continue")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(AppColors.accent)
+                        .foregroundColor(AppColors.background)
+                        .font(.system(size: 14, weight: .semibold))
+                        .cornerRadius(8)
+                    }
                 }
-                .padding(.bottom, 30)
+                .padding(24)
+                .background(AppColors.surfaceLight)
+                .cornerRadius(16)
+                .padding(24)
             }
-            .padding(.horizontal, 20)
         }
     }
 }
 
-struct LoginFormView: View {
-    @EnvironmentObject var authService: AuthService
-    @State private var email = ""
-    @State private var password = ""
+class AccessKeyViewModel: ObservableObject {
+    @Published var generatedKey: AccessKey?
+    @Published var isLoading = false
+    @Published var errorMessage: String?
     
-    var body: some View {
-        VStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Email")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(AppColors.textSecondary)
-                
-                TextField("name@example.com", text: $email)
-                    .textContentType(.emailAddress)
-                    .keyboardType(.emailAddress)
-                    .autocapitalization(.none)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(AppColors.surface)
-                    .cornerRadius(8)
-                    .foregroundColor(AppColors.textPrimary)
+    private let storageService = StorageService()
+    private let cryptoService = CryptoService.shared
+    
+    func generateAccessKey() async {
+        DispatchQueue.main.async { self.isLoading = true }
+        
+        do {
+            let (key, _) = try storageService.generateNewAccessKey()
+            DispatchQueue.main.async {
+                self.generatedKey = key
+                self.isLoading = false
             }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Пароль")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(AppColors.textSecondary)
-                
-                SecureField("••••••••", text: $password)
-                    .textContentType(.password)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(AppColors.surface)
-                    .cornerRadius(8)
-                    .foregroundColor(AppColors.textPrimary)
+        } catch {
+            DispatchQueue.main.async {
+                self.errorMessage = "Failed to generate key"
+                self.isLoading = false
             }
-            
-            Button(action: {
-                Task {
-                    await authService.login(email: email, password: password)
-                }
-            }) {
-                if authService.isLoading {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .tint(.white)
-                } else {
-                    Text("Войти")
-                        .font(.system(size: 16, weight: .semibold))
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(AppColors.accentBlue)
-            .foregroundColor(AppColors.accentWhite)
-            .cornerRadius(8)
-            .disabled(authService.isLoading || email.isEmpty || password.isEmpty)
         }
     }
-}
-
-struct RegisterFormView: View {
-    @EnvironmentObject var authService: AuthService
-    @State private var email = ""
-    @State private var username = ""
-    @State private var password = ""
-    @State private var confirmPassword = ""
     
-    var isFormValid: Bool {
-        !email.isEmpty && !username.isEmpty && !password.isEmpty && password == confirmPassword && password.count >= 6
+    func confirmAccessKey() {
+        guard let key = generatedKey else { return }
+        storageService.setCurrentAccessKey(key)
     }
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Email")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(AppColors.textSecondary)
-                
-                TextField("name@example.com", text: $email)
-                    .textContentType(.emailAddress)
-                    .keyboardType(.emailAddress)
-                    .autocapitalization(.none)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(AppColors.surface)
-                    .cornerRadius(8)
-                    .foregroundColor(AppColors.textPrimary)
-            }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Имя пользователя")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(AppColors.textSecondary)
-                
-                TextField("username", text: $username)
-                    .autocapitalization(.none)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(AppColors.surface)
-                    .cornerRadius(8)
-                    .foregroundColor(AppColors.textPrimary)
-            }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Пароль")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(AppColors.textSecondary)
-                
-                SecureField("Минимум 6 символов", text: $password)
-                    .textContentType(.newPassword)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(AppColors.surface)
-                    .cornerRadius(8)
-                    .foregroundColor(AppColors.textPrimary)
-            }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Подтверждение пароля")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(AppColors.textSecondary)
-                
-                SecureField("Повторите пароль", text: $confirmPassword)
-                    .textContentType(.newPassword)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(AppColors.surface)
-                    .cornerRadius(8)
-                    .foregroundColor(AppColors.textPrimary)
-            }
-            
-            Button(action: {
-                Task {
-                    await authService.register(email: email, username: username, password: password)
-                }
-            }) {
-                if authService.isLoading {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .tint(.white)
-                } else {
-                    Text("Зарегистрироваться")
-                        .font(.system(size: 16, weight: .semibold))
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(AppColors.accentBlue)
-            .foregroundColor(AppColors.accentWhite)
-            .cornerRadius(8)
-            .disabled(!isFormValid || authService.isLoading)
-            .opacity(isFormValid ? 1.0 : 0.5)
-        }
-    }
-}
-
-#Preview {
-    AuthView()
-        .environmentObject(AuthService())
 }
