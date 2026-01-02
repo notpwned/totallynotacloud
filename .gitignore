@@ -1,0 +1,36 @@
+# Xcode
+*.pbxuser
+*.perspectivev3
+*.xcworkspace/
+!default.xcworkspace/
+*.xcodeproj/
+.DS_Store
+.swiftpm/
+
+# Swift
+.build/
+*.swiftmodule/
+*.swiftdoc/
+
+# Dependency
+Package.resolved
+
+# User-specific files
+*.swiftpm
+userInterfaceState.xcuserstate
+
+# IDE
+.idea/
+.vscode/
+
+# macOS
+.DS_Store
+ds_store
+
+# Pods
+Pods/
+Podfile.lock
+
+# Environment
+.env
+.env.local
