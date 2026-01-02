@@ -4,7 +4,7 @@ import CommonCrypto
 class CryptoService {
     static let shared = CryptoService()
     
-    private let keychainService = "com.totallynotacloud.keys"
+    private let keychainService = KeychainService.shared
     
     func generateKeyPair() throws -> (publicKey: String, privateKey: String) {
         let keySize = 2048
@@ -82,42 +82,6 @@ class CryptoService {
     func generateAccessKey(length: Int = 32) -> String {
         let letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
         return String((0..<length).map { _ in letters.randomElement()! })
-    }
-    
-    func saveAccessKeyToKeychain(_ key: AccessKey) throws {
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(key)
-        
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: key.keyId,
-            kSecValueData as String: data
-        ]
-        
-        SecItemDelete(query as CFDictionary)
-        let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw CryptoError.keychainError
-        }
-    }
-    
-    func retrieveAccessKeyFromKeychain(keyId: String) throws -> AccessKey {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: keyId,
-            kSecReturnData as String: true
-        ]
-        
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess, let data = result as? Data else {
-            throw CryptoError.keychainError
-        }
-        
-        let decoder = JSONDecoder()
-        return try decoder.decode(AccessKey.self, from: data)
     }
 }
 

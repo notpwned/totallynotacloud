@@ -6,6 +6,7 @@ struct AuthView: View {
     @State private var showQRScanner = false
     @State private var generatedKey: AccessKey?
     @State private var generatedQRString = ""
+    @Binding var isAuthenticated: Bool
     
     var body: some View {
         ZStack {
@@ -96,7 +97,14 @@ struct AuthView: View {
                     .background(AppColors.surface)
                     .cornerRadius(12)
                     
-                    Button(action: { viewModel.confirmAccessKey() }) {
+                    Button(action: {
+                        Task {
+                            await viewModel.confirmAccessKey()
+                            DispatchQueue.main.async {
+                                isAuthenticated = true
+                            }
+                        }
+                    }) {
                         HStack {
                             Image(systemName: "checkmark.circle.fill").font(.system(size: 16))
                             Text("Continue")
@@ -125,6 +133,7 @@ class AccessKeyViewModel: ObservableObject {
     
     private let storageService = StorageService()
     private let cryptoService = CryptoService.shared
+    private let keychainService = KeychainService.shared
     
     func generateAccessKey() async {
         DispatchQueue.main.async { self.isLoading = true }
@@ -143,8 +152,16 @@ class AccessKeyViewModel: ObservableObject {
         }
     }
     
-    func confirmAccessKey() {
+    func confirmAccessKey() async {
         guard let key = generatedKey else { return }
-        storageService.setCurrentAccessKey(key)
+        
+        do {
+            try keychainService.saveAccessKey(key)
+            storageService.setCurrentAccessKey(key)
+        } catch {
+            DispatchQueue.main.async {
+                self.errorMessage = "Failed to save key"
+            }
+        }
     }
 }
