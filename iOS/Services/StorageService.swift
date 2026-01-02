@@ -10,6 +10,7 @@ class StorageService: ObservableObject {
     
     private let apiBaseURL = "https://api.totallynotacloud.local"
     private let cryptoService = CryptoService.shared
+    private let keychainService = KeychainService.shared
     private var currentAccessKey: AccessKey?
     
     init() {
@@ -19,7 +20,6 @@ class StorageService: ObservableObject {
     func generateNewAccessKey() throws -> (key: AccessKey, qrCode: String) {
         let keyId = UUID().uuidString
         let accessKey = cryptoService.generateAccessKey()
-        let keyHash = cryptoService.hashAccessKey(accessKey)
         
         let (publicKey, privateKey) = try cryptoService.generateKeyPair()
         
@@ -31,8 +31,8 @@ class StorageService: ObservableObject {
             permissions: ["read", "write", "delete"]
         )
         
-        try cryptoService.saveAccessKeyToKeychain(accessKeyModel)
-        self.currentAccessKey = accessKeyModel
+        try keychainService.saveAccessKey(accessKeyModel)
+        currentAccessKey = accessKeyModel
         
         let qrData = "\(keyId):\(accessKey)"
         return (accessKeyModel, qrData)
@@ -45,8 +45,8 @@ class StorageService: ObservableObject {
         }
         
         let keyId = String(components[0])
-        let accessKey = try cryptoService.retrieveAccessKeyFromKeychain(keyId: keyId)
-        self.currentAccessKey = accessKey
+        let accessKey = try keychainService.retrieveAccessKey(keyId: keyId)
+        currentAccessKey = accessKey
     }
     
     func loadFiles(folderId: String? = nil) async {
@@ -55,7 +55,7 @@ class StorageService: ObservableObject {
             self.errorMessage = nil
         }
         
-        guard let _ = currentAccessKey else {
+        guard currentAccessKey != nil else {
             DispatchQueue.main.async {
                 self.errorMessage = "No access key available"
                 self.isLoading = false
@@ -200,7 +200,7 @@ class StorageService: ObservableObject {
     }
     
     func setCurrentAccessKey(_ key: AccessKey) {
-        self.currentAccessKey = key
+        currentAccessKey = key
     }
     
     private func loadMockFiles() {
