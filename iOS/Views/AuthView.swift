@@ -2,10 +2,7 @@ import SwiftUI
 
 struct AuthView: View {
     @StateObject private var viewModel = AccessKeyViewModel()
-    @State private var showQRCode = false
-    @State private var showQRScanner = false
-    @State private var generatedKey: AccessKey?
-    @State private var generatedQRString = ""
+    @State private var showKeyModal = false
     @Binding var isAuthenticated: Bool
     
     var body: some View {
@@ -21,7 +18,7 @@ struct AuthView: View {
                 Spacer()
                 
                 VStack(spacing: 16) {
-                    Button(action: { Task { await viewModel.generateAccessKey() } }) {
+                    Button(action: { Task { await viewModel.generateAccessKey(); showKeyModal = true } }) {
                         HStack {
                             Image(systemName: "key.fill").font(.system(size: 16))
                             Text("Generate Access Key")
@@ -34,10 +31,10 @@ struct AuthView: View {
                         .cornerRadius(8)
                     }
                     
-                    Button(action: { showQRScanner = true }) {
+                    Button(action: {}) {
                         HStack {
-                            Image(systemName: "qrcode.viewfinder").font(.system(size: 16))
-                            Text("Scan Access Key")
+                            Image(systemName: "doc.text.magnifyingglass").font(.system(size: 16))
+                            Text("Import Access Key")
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
@@ -57,51 +54,61 @@ struct AuthView: View {
                 }
             }
             .padding(.vertical, 48)
-            
+        }
+        .sheet(isPresented: $showKeyModal) {
             if let key = viewModel.generatedKey {
-                VStack(spacing: 24) {
-                    VStack(spacing: 16) {
+                VStack(spacing: 16) {
+                    HStack {
                         Text("Your Access Key").font(.system(size: 18, weight: .semibold)).foregroundColor(AppColors.textPrimary)
-                        
-                        VStack(spacing: 12) {
-                            Text("Key ID:").font(.system(size: 12, weight: .semibold)).foregroundColor(AppColors.textSecondary).frame(maxWidth: .infinity, alignment: .leading)
-                            Text(key.keyId).font(.system(size: 11, weight: .regular, design: .monospaced)).foregroundColor(AppColors.textPrimary).frame(maxWidth: .infinity, alignment: .leading).padding(8).background(AppColors.surface).cornerRadius(6)
-                            
-                            Button(action: { UIPasteboard.general.string = key.keyId }) {
-                                HStack {
-                                    Image(systemName: "doc.on.doc").font(.system(size: 12))
-                                    Text("Copy")
-                                }
-                                .font(.system(size: 12, weight: .regular))
-                                .foregroundColor(AppColors.textPrimary)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                        }
-                        
-                        VStack(spacing: 12) {
-                            Text("Save your private key securely:").font(.system(size: 12, weight: .semibold)).foregroundColor(AppColors.textSecondary).frame(maxWidth: .infinity, alignment: .leading)
-                            Text(key.privateKey).font(.system(size: 10, weight: .regular, design: .monospaced)).foregroundColor(AppColors.textPrimary).lineLimit(3).frame(maxWidth: .infinity, alignment: .leading).padding(8).background(AppColors.surface).cornerRadius(6)
-                            
-                            Button(action: { UIPasteboard.general.string = key.privateKey }) {
-                                HStack {
-                                    Image(systemName: "doc.on.doc").font(.system(size: 12))
-                                    Text("Copy")
-                                }
-                                .font(.system(size: 12, weight: .regular))
-                                .foregroundColor(AppColors.textPrimary)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .trailing)
+                        Spacer()
+                        Button(action: { showKeyModal = false }) {
+                            Image(systemName: "xmark.circle.fill").font(.system(size: 20)).foregroundColor(AppColors.textTertiary)
                         }
                     }
                     .padding(16)
-                    .background(AppColors.surface)
-                    .cornerRadius(12)
+                    
+                    ScrollView {
+                        VStack(spacing: 16) {
+                            VStack(spacing: 12) {
+                                Text("Key ID:").font(.system(size: 12, weight: .semibold)).foregroundColor(AppColors.textSecondary).frame(maxWidth: .infinity, alignment: .leading)
+                                Text(key.keyId).font(.system(size: 11, weight: .regular, design: .monospaced)).foregroundColor(AppColors.textPrimary).frame(maxWidth: .infinity, alignment: .leading).padding(8).background(AppColors.surface).cornerRadius(6)
+                                
+                                Button(action: { UIPasteboard.general.string = key.keyId }) {
+                                    HStack {
+                                        Image(systemName: "doc.on.doc").font(.system(size: 12))
+                                        Text("Copy")
+                                    }
+                                    .font(.system(size: 12, weight: .regular))
+                                    .foregroundColor(AppColors.accent)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                            }
+                            
+                            VStack(spacing: 12) {
+                                Text("Save your private key securely:").font(.system(size: 12, weight: .semibold)).foregroundColor(AppColors.textSecondary).frame(maxWidth: .infinity, alignment: .leading)
+                                Text(key.privateKey).font(.system(size: 10, weight: .regular, design: .monospaced)).foregroundColor(AppColors.textPrimary).lineLimit(5).frame(maxWidth: .infinity, alignment: .leading).padding(8).background(AppColors.surface).cornerRadius(6)
+                                
+                                Button(action: { UIPasteboard.general.string = key.privateKey }) {
+                                    HStack {
+                                        Image(systemName: "doc.on.doc").font(.system(size: 12))
+                                        Text("Copy")
+                                    }
+                                    .font(.system(size: 12, weight: .regular))
+                                    .foregroundColor(AppColors.accent)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                            }
+                        }
+                        .padding(16)
+                    }
+                    .frame(maxHeight: .infinity)
                     
                     Button(action: {
                         Task {
                             await viewModel.confirmAccessKey()
                             DispatchQueue.main.async {
                                 isAuthenticated = true
+                                showKeyModal = false
                             }
                         }
                     }) {
@@ -116,11 +123,11 @@ struct AuthView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .cornerRadius(8)
                     }
+                    .padding(16)
                 }
-                .padding(24)
-                .background(AppColors.surfaceLight)
-                .cornerRadius(16)
-                .padding(24)
+                .background(AppColors.background)
+                .presentationDetents([.height(500)])
+                .presentationCornerRadius(16)
             }
         }
     }
@@ -132,7 +139,6 @@ class AccessKeyViewModel: ObservableObject {
     @Published var errorMessage: String?
     
     private let storageService = StorageService()
-    private let cryptoService = CryptoService.shared
     private let keychainService = KeychainService.shared
     
     func generateAccessKey() async {
@@ -146,7 +152,7 @@ class AccessKeyViewModel: ObservableObject {
             }
         } catch {
             DispatchQueue.main.async {
-                self.errorMessage = "Failed to generate key"
+                self.errorMessage = "Failed to generate key: \(error.localizedDescription)"
                 self.isLoading = false
             }
         }
@@ -160,7 +166,7 @@ class AccessKeyViewModel: ObservableObject {
             storageService.setCurrentAccessKey(key)
         } catch {
             DispatchQueue.main.async {
-                self.errorMessage = "Failed to save key"
+                self.errorMessage = "Failed to save key: \(error.localizedDescription)"
             }
         }
     }

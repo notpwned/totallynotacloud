@@ -2,8 +2,7 @@ import Foundation
 import Combine
 
 class StorageService: ObservableObject {
-    @Published var files: [CloudFile] = []
-    @Published var currentFolder: CloudFile?
+    @Published var exchangeFiles: [ExchangeFile] = []
     @Published var isLoading = false
     @Published var uploadProgress: [UploadProgress] = []
     @Published var errorMessage: String?
@@ -13,9 +12,7 @@ class StorageService: ObservableObject {
     private let keychainService = KeychainService.shared
     private var currentAccessKey: AccessKey?
     
-    init() {
-        loadMockFiles()
-    }
+    init() {}
     
     func generateNewAccessKey() throws -> (key: AccessKey, qrCode: String) {
         let keyId = UUID().uuidString
@@ -49,30 +46,6 @@ class StorageService: ObservableObject {
         currentAccessKey = accessKey
     }
     
-    func loadFiles(folderId: String? = nil) async {
-        DispatchQueue.main.async {
-            self.isLoading = true
-            self.errorMessage = nil
-        }
-        
-        guard currentAccessKey != nil else {
-            DispatchQueue.main.async {
-                self.errorMessage = "No access key available"
-                self.isLoading = false
-            }
-            return
-        }
-        
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
-        
-        DispatchQueue.main.async {
-            if self.files.isEmpty {
-                self.loadMockFiles()
-            }
-            self.isLoading = false
-        }
-    }
-    
     func uploadFile(data: Data, name: String, mimeType: String) async {
         guard let accessKey = currentAccessKey else {
             DispatchQueue.main.async {
@@ -101,18 +74,23 @@ class StorageService: ObservableObject {
                 }
             }
             
-            let newFile = CloudFile(
+            let expiresAt = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+            
+            let newFile = ExchangeFile(
                 id: UUID().uuidString,
                 name: name,
                 size: Int64(encryptedData.count),
                 mimeType: mimeType,
                 uploadedAt: Date(),
-                updatedAt: Date(),
-                accessKeyHash: keyHash
+                expiresAt: expiresAt,
+                accessHash: keyHash,
+                downloadCount: 0,
+                maxDownloads: -1,
+                encryptedData: encryptedData
             )
             
             DispatchQueue.main.async {
-                self.files.insert(newFile, at: 0)
+                self.exchangeFiles.insert(newFile, at: 0)
                 
                 if let index = self.uploadProgress.firstIndex(where: { $0.fileName == name }) {
                     self.uploadProgress[index].isComplete = true
@@ -129,7 +107,7 @@ class StorageService: ObservableObject {
         }
     }
     
-    func deleteFile(_ file: CloudFile) async {
+    func deleteFile(_ fileId: String) async {
         guard currentAccessKey != nil else {
             DispatchQueue.main.async {
                 self.errorMessage = "No access key available"
@@ -138,104 +116,23 @@ class StorageService: ObservableObject {
         }
         
         DispatchQueue.main.async {
-            self.files.removeAll { $0.id == file.id }
-        }
-    }
-    
-    func downloadFile(_ file: CloudFile) async -> Data? {
-        guard let accessKey = currentAccessKey else {
-            DispatchQueue.main.async {
-                self.errorMessage = "No access key available"
-            }
-            return nil
-        }
-        
-        do {
-            let encryptedData = Data()
-            let decryptedData = try cryptoService.decryptData(encryptedData, privateKey: accessKey.privateKey)
-            return decryptedData
-        } catch {
-            DispatchQueue.main.async {
-                self.errorMessage = "Decryption failed"
-            }
-            return nil
-        }
-    }
-    
-    func renameFile(_ file: CloudFile, newName: String) async {
-        if let index = files.firstIndex(where: { $0.id == file.id }) {
-            DispatchQueue.main.async {
-                var updatedFile = self.files[index]
-                updatedFile.name = newName
-                updatedFile.updatedAt = Date()
-                self.files[index] = updatedFile
-            }
-        }
-    }
-    
-    func createFolder(name: String) async {
-        guard let accessKey = currentAccessKey else {
-            DispatchQueue.main.async {
-                self.errorMessage = "No access key available"
-            }
-            return
-        }
-        
-        let keyHash = cryptoService.hashAccessKey(accessKey.keyId)
-        
-        let newFolder = CloudFile(
-            id: UUID().uuidString,
-            name: name,
-            size: 0,
-            mimeType: "application/x-folder",
-            uploadedAt: Date(),
-            updatedAt: Date(),
-            isDirectory: true,
-            accessKeyHash: keyHash
-        )
-        
-        DispatchQueue.main.async {
-            self.files.insert(newFolder, at: 0)
+            self.exchangeFiles.removeAll { $0.id == fileId }
         }
     }
     
     func setCurrentAccessKey(_ key: AccessKey) {
         currentAccessKey = key
     }
-    
-    private func loadMockFiles() {
-        let mockKeyHash = "mock-hash"
-        
-        let mockFiles: [CloudFile] = [
-            CloudFile(
-                id: "1",
-                name: "Documents",
-                size: 0,
-                mimeType: "application/x-folder",
-                uploadedAt: Date(timeIntervalSinceNow: -86400),
-                updatedAt: Date(timeIntervalSinceNow: -3600),
-                isDirectory: true,
-                accessKeyHash: mockKeyHash
-            ),
-            CloudFile(
-                id: "2",
-                name: "Photos",
-                size: 0,
-                mimeType: "application/x-folder",
-                uploadedAt: Date(timeIntervalSinceNow: -172800),
-                updatedAt: Date(timeIntervalSinceNow: -7200),
-                isDirectory: true,
-                accessKeyHash: mockKeyHash
-            )
-        ]
-        
-        DispatchQueue.main.async {
-            self.files = mockFiles
-        }
-    }
 }
 
 enum StorageError: Error {
     case invalidQRCode
     case noAccessKey
+}
+
+struct UploadProgress: Identifiable {
+    let id = UUID()
+    let fileName: String
+    var progress: Double
+    var isComplete = false
 }
