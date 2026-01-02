@@ -14,9 +14,8 @@ class StorageService: ObservableObject {
     
     init() {}
     
-    func generateNewAccessKey() throws -> (key: AccessKey, qrCode: String) {
+    func generateNewAccessKey() async throws -> AccessKey {
         let keyId = UUID().uuidString
-        let accessKey = cryptoService.generateAccessKey()
         
         let (publicKey, privateKey) = try cryptoService.generateKeyPair()
         
@@ -29,21 +28,34 @@ class StorageService: ObservableObject {
         )
         
         try keychainService.saveAccessKey(accessKeyModel)
-        currentAccessKey = accessKeyModel
         
-        let qrData = "\(keyId):\(accessKey)"
-        return (accessKeyModel, qrData)
-    }
-    
-    func importAccessKeyFromQR(_ qrData: String) throws {
-        let components = qrData.split(separator: ":")
-        guard components.count == 2 else {
-            throw StorageError.invalidQRCode
+        DispatchQueue.main.async {
+            self.currentAccessKey = accessKeyModel
         }
         
-        let keyId = String(components[0])
-        let accessKey = try keychainService.retrieveAccessKey(keyId: keyId)
-        currentAccessKey = accessKey
+        return accessKeyModel
+    }
+    
+    func loadStoredAccessKey() async throws -> AccessKey? {
+        do {
+            let keys = try keychainService.getAllAccessKeys()
+            if let key = keys.first {
+                DispatchQueue.main.async {
+                    self.currentAccessKey = key
+                }
+                return key
+            }
+            return nil
+        } catch {
+            return nil
+        }
+    }
+    
+    func importAccessKey(_ accessKey: AccessKey) throws {
+        try keychainService.saveAccessKey(accessKey)
+        DispatchQueue.main.async {
+            self.currentAccessKey = accessKey
+        }
     }
     
     func uploadFile(data: Data, name: String, mimeType: String) async {
