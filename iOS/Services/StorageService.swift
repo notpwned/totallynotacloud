@@ -129,10 +129,3 @@ enum StorageError: Error {
     case invalidQRCode
     case noAccessKey
 }
-
-struct UploadProgress: Identifiable {
-    let id = UUID()
-    let fileName: String
-    var progress: Double
-    var isComplete = false
-}
