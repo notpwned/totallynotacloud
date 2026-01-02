@@ -80,6 +80,7 @@ class StorageService: ObservableObject {
         if let index = files.firstIndex(where: { $0.id == file.id }) {
             DispatchQueue.main.async {
                 var updatedFile = self.files[index]
+                updatedFile.name = newName
                 updatedFile.updatedAt = Date()
                 self.files[index] = updatedFile
             }

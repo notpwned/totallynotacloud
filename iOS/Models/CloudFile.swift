@@ -3,11 +3,11 @@ import Foundation
 /// Модель файла в облачном хранилище
 struct CloudFile: Identifiable, Codable {
     let id: String
-    let name: String
+    var name: String
     let size: Int64
     let mimeType: String
     let uploadedAt: Date
-    let updatedAt: Date
+    var updatedAt: Date
     var isDirectory: Bool = false
     var parentId: String?
     
