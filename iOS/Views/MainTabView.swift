@@ -37,8 +37,7 @@ struct MainTabView: View {
 struct SettingsView: View {
     @EnvironmentObject var storageService: StorageService
     @State private var showExportKey = false
-    @State private var showingAlert = false
-    @State private var alertMessage = ""
+    @State private var privateKeyText = ""
     
     var body: some View {
         NavigationStack {
