@@ -2,43 +2,25 @@
 
 Private. Encrypted. Yours.
 
-Zero-knowledge cloud storage with client-side encryption, no user accounts, and complete privacy control. Every file is encrypted before reaching the server. Only you can decrypt your files.
+Zero-knowledge encrypted file exchange. No accounts, no tracking, complete privacy. Files are encrypted on your device before upload. Server cannot decrypt anything.
 
 ## Features
 
 - Zero-Knowledge Architecture: Server cannot decrypt files
-- No User Accounts: Generate access keys instead of passwords
-- Client-Side Encryption: Files encrypted before upload with RSA-2048
-- No Data Collection: No metadata, no tracking, no logs
-- Access Control: Share encrypted keys via QR code
-- Memory Protection: Sensitive data encrypted in RAM
-- Self-Destruct: Files expire automatically (default 90 days)
-- Minimal UI: NothingOS-inspired black and white design
-- Open Source: Full transparency on security model
+- File Exchange: Share encrypted files via pseudo-links
+- No Accounts: Generate access keys instead of passwords
+- Client-Side Encryption: RSA-2048 encryption before upload
+- Keychain Storage: Private keys secured in OS Keychain
+- Auto-Expiration: Files expire automatically
+- Minimal UI: Clean black and white design
+- Open Source: Full transparency
 
 ## Platform Support
 
-### iOS
-- Minimum iOS 16.0
-- Native SwiftUI interface
-- Secure Keychain storage
-- QR code generation and scanning
-
-### macOS
-- Minimum macOS 13.0
-- Desktop-optimized interface
-- Drag and drop file management
-- Native Keychain integration
+- iOS 16.0+
+- macOS 13.0+ (coming soon)
 
 ## Installation
-
-### Prerequisites
-
-- macOS 13.0 or later
-- Xcode 15.0 or later
-- iOS device or simulator
-
-### Setup
 
 1. Clone repository
 
@@ -47,227 +29,175 @@ git clone https://github.com/notpwned/totallynotacloud.git
 cd totallynotacloud
 ```
 
-2. Open in Xcode
+2. Open iOS project in Xcode
 
 ```bash
 xed iOS/
 ```
 
-3. Create new iOS project in Xcode and add Swift files
+3. Build and run on simulator or device
 
-4. Build and run on simulator or device
+## First Launch
 
-## Server Setup
+1. Open app
+2. Tap "Generate Access Key"
+3. Save your Key ID and Private Key securely
+4. Tap "Continue" to authenticate
+5. Start uploading files
 
-See [SERVER_SETUP.md](SERVER_SETUP.md) for complete server deployment guide.
+## How It Works
 
-Key points:
-- Zero-knowledge encryption architecture
-- All files encrypted server-side with AES-256-GCM
-- Private keys never transmitted to server
-- Optional MinIO or S3-compatible storage
-- MongoDB for encrypted metadata
-- Automatic file expiration
+### File Upload
+
+1. Select file to share
+2. File encrypted with your public key on device
+3. Upload encrypted blob to server
+4. Receive pseudo-link (tcd://exchange/[fileId])
+5. Share link with others
+
+### File Download
+
+1. Receive pseudo-link from sender
+2. Download encrypted file from server
+3. Decrypt using your private key
+4. Save decrypted file
 
 ## Architecture
 
-### Client Flow
+### Client-Side
 
-1. Generate access key (RSA-2048 key pair)
-2. Save private key in Keychain
-3. Share public key via QR code
-4. File encrypted locally before upload
-5. Upload encrypted blob to server
-6. Server stores encrypted data only
-7. Download receives encrypted file
-8. Client decrypts with private key
+- RSA-2048 key generation
+- File encryption before upload
+- Private key stored in Keychain
+- No plain text data in memory
 
-### Server Flow
+### Server-Side
 
-1. Receive encrypted file from client
-2. Encrypt blob server-side (AES-256-GCM)
-3. Store in S3-compatible storage
-4. Store metadata in database (no plain text)
-5. Validate access key hash on download
-6. Return encrypted blob to client
-7. Delete after expiration (90 days default)
+- AES-256-GCM encryption on server
+- No user accounts or sessions
+- Access control via key hashes
+- Automatic file expiration
+- S3-compatible storage
 
-## Security Model
+## Security
 
 ### What Server Sees
 
 - Access key hash (not the actual key)
-- File size (encrypted)
-- MIME type (encrypted)
-- Upload timestamp (encrypted)
-- Expiration date
+- Encrypted file blob
+- File size and MIME type
+- Upload and expiration timestamps
 
 ### What Server Does NOT See
 
 - File contents
-- File names
-- User identity
-- Access patterns
 - Private keys
-- Unencrypted metadata
-
-### Encryption
-
-- Client: RSA-2048 public key encryption
-- Server: AES-256-GCM symmetric encryption
-- Transport: TLS 1.3
-- Storage: At-rest encryption in database and S3
+- User identity
+- Download history
+- Access patterns
 
 ## Project Structure
 
 ```
 iOS/
   Models/
-    CloudFile.swift
+    AccessKey.swift
+    ExchangeFile.swift
+    UploadProgress.swift
   Services/
     CryptoService.swift
+    KeychainService.swift
     StorageService.swift
   Views/
     AuthView.swift
     FilesView.swift
-    etc.
+    MainTabView.swift
+    SettingsView.swift
   App/
     AppColors.swift
     totallynotacloudApp.swift
-
-macOS/
-  Views/
-    AuthView.swift
-    ContentView.swift
-  App/
-    AppColors.swift
-
-SERVER_SETUP.md
-README.md
 ```
 
-## Key Generation
+## Server Setup
 
-On first launch, the app generates an RSA-2048 key pair:
+See SERVER_SETUP.md for complete server deployment guide.
 
-- Public Key: Shared with others to allow file uploads
-- Private Key: Stored securely in Keychain, never leaves device
+### Requirements
 
-Both keys are needed for full encryption/decryption workflow.
+- Node.js 18+
+- MongoDB 6+
+- MinIO or AWS S3
+- TLS 1.3+ support
 
-## Sharing Files
+### Quick Start
 
-1. Generate access key (creates public/private keypair)
-2. Display QR code with key ID and public key
-3. Share QR code with recipient
-4. Recipient scans to grant access
-5. Upload encrypted file
-6. Share file ID (optional, public) with recipient
+```bash
+cd server
+npm install
+cp .env.example .env
+# Edit .env with your settings
+npm start
+```
 
-## File Expiration
-
-Files automatically deleted after configurable period:
-
-- Default: 90 days
-- Maximum: 1 year
-- Minimum: 1 day
-- Server automatically removes at expiration
-- No manual intervention needed
-
-## Privacy Guarantees
-
-- No email required
-- No username/password
-- No IP logging
-- No access history
-- No download tracking
-- No device fingerprinting
-- No analytics
-- No cookies
-- No persistent user data
-
-## API Endpoints
+## API
 
 All endpoints require `x-access-key-hash` header.
 
-### Upload File
+### POST /api/upload
 
-```
-POST /api/upload
-Body: {
-  fileId: string,
-  fileName: string (encrypted),
-  encryptedData: base64-string,
-  accessKeyHash: string,
-  mimeType: string
+```json
+{
+  "fileName": "encrypted-string",
+  "encryptedData": "base64-string",
+  "mimeType": "application/octet-stream",
+  "expiresIn": 604800
 }
-Response: { fileId, success }
 ```
 
-### Download File
+Response:
 
-```
-GET /api/download/:fileId
-Header: x-access-key-hash
-Response: Encrypted file blob
-```
-
-### List Files
-
-```
-GET /api/files
-Header: x-access-key-hash
-Response: { files: [ { fileId, size, mimeType, uploadedAt } ] }
+```json
+{
+  "fileId": "uuid",
+  "expiresAt": "2026-01-09T20:40:00Z"
+}
 ```
 
-### Delete File
+### GET /api/download/:fileId
 
-```
-DELETE /api/files/:fileId
-Header: x-access-key-hash
-Response: { success }
-```
+Returns encrypted file blob.
 
-## Environment Variables (Client)
+### GET /api/files
 
-```bash
-API_BASE_URL=https://api.totallynotacloud.local
-RSA_KEY_SIZE=2048
-DEFAULT_EXPIRATION_DAYS=90
-```
+Returns list of user's uploaded files.
 
-## Environment Variables (Server)
+### DELETE /api/files/:fileId
 
-See SERVER_SETUP.md for complete list.
+Deletes file from server.
+
+## Privacy Guarantees
+
+- No email or username required
+- No password database
+- No session tokens
+- No IP logging
+- No device fingerprinting
+- No analytics
+- No cookies
+- No persistent user identification
 
 ## Performance
 
-- RSA encryption: ~100ms per file
-- Upload speed: Limited by network
-- Download speed: Limited by network
+- Encryption time: 50-200ms per file (varies by size)
+- Upload speed: Network limited
 - File size limit: 10GB (configurable)
-- Concurrent uploads: Unlimited
-
-## Browser Support
-
-- Not a web application
-- iOS and macOS native apps only
-- Better security guarantees than web
-- No JavaScript vulnerabilities
-- Direct access to OS security features
 
 ## Development
 
-### Building iOS
+### Building
 
 ```bash
 xcodebuild -scheme totallynotacloud -configuration Debug
-```
-
-### Building macOS
-
-```bash
-xcodebuild -scheme totallynotacloud -configuration Debug -destination 'platform=macOS'
 ```
 
 ### Testing
@@ -278,60 +208,38 @@ xcodebuild test -scheme totallynotacloud
 
 ## Documentation
 
-- SERVER_SETUP.md - Complete server deployment guide
-- COMPONENTS.md - Detailed component documentation
-- QUICKSTART.md - Getting started guide
-- API_SPEC.md - API specification
-- DEVELOPMENT.md - Development guide
+- SERVER_SETUP.md - Server deployment and configuration
+- PRIVACY_ARCHITECTURE.md - Detailed security model
+- GETTING_STARTED.md - Step-by-step guide
 
 ## Contributing
 
-1. Fork the repository
-2. Create feature branch
-3. Make changes
-4. Submit pull request
+Fork, branch, commit, push, pull request.
 
 ## License
 
-MIT License - See LICENSE file
+MIT License
 
 ## Security
 
-For security vulnerabilities, contact: security@totallynotacloud.local
+For security issues: security@totallynotacloud.local
 
-Do not create public GitHub issues for security problems.
-
-## Roadmap
-
-- Android support
-- Web interface (client-side encryption only)
-- Desktop applications (Windows, Linux)
-- File versioning
-- Collaborative encryption
-- Hardware security key support
+Do not create public GitHub issues for vulnerabilities.
 
 ## FAQ
 
-Q: Can the server see my files?
-A: No. Files are encrypted on your device before upload. Server only stores encrypted blobs.
+Q: Can the server read my files?
+A: No. Files encrypted on your device before upload.
 
-Q: Can you help me recover my files?
-A: Only if you have your private key. No backdoor exists.
+Q: What if I lose my access key?
+A: Generate a new one. Old files become inaccessible (by design).
 
-Q: What if I lose my device?
-A: Generate a new access key. Old files become inaccessible (by design).
+Q: Can you recover my deleted files?
+A: No. Deleted files are gone permanently.
 
-Q: Can you see who downloaded my files?
-A: No. Server does not log access patterns or user identity.
-
-Q: Is this open source?
-A: Yes. Full source code on GitHub. Audit welcome.
-
-Q: How is this different from other cloud storage?
-A: Zero-knowledge architecture means server literally cannot see your data.
+Q: Why no web version?
+A: Native apps provide better security guarantees than web browsers.
 
 ## Status
 
-Active Development
-
-First Release: January 2026
+Active development - January 2026
