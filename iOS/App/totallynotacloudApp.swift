@@ -2,18 +2,23 @@ import SwiftUI
 
 @main
 struct totallynotacloudApp: App {
-    @StateObject private var authService = AuthService()
     @StateObject private var storageService = StorageService()
+    @State private var hasAccessKey = false
     
     var body: some Scene {
         WindowGroup {
-            if authService.isAuthenticated {
-                MainTabView()
-                    .environmentObject(authService)
-                    .environmentObject(storageService)
-            } else {
-                AuthView()
-                    .environmentObject(authService)
+            ZStack {
+                AppColors.background.ignoresSafeArea()
+                
+                if hasAccessKey {
+                    MainTabView()
+                        .environmentObject(storageService)
+                } else {
+                    AuthView()
+                        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AccessKeyCreated"))) { _ in
+                            hasAccessKey = true
+                        }
+                }
             }
         }
     }
