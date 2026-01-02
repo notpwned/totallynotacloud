@@ -3,6 +3,9 @@ import SwiftUI
 struct AuthView: View {
     @StateObject private var viewModel = AccessKeyViewModel()
     @State private var showKeyModal = false
+    @State private var showImportSheet = false
+    @State private var importKeyId = ""
+    @State private var importPrivateKey = ""
     @Binding var isAuthenticated: Bool
     
     var body: some View {
@@ -31,9 +34,9 @@ struct AuthView: View {
                         .cornerRadius(8)
                     }
                     
-                    Button(action: {}) {
+                    Button(action: { showImportSheet = true }) {
                         HStack {
-                            Image(systemName: "doc.text.magnifyingglass").font(.system(size: 16))
+                            Image(systemName: "square.and.arrow.down").font(.system(size: 16))
                             Text("Import Access Key")
                         }
                         .frame(maxWidth: .infinity)
@@ -85,8 +88,8 @@ struct AuthView: View {
                             }
                             
                             VStack(spacing: 12) {
-                                Text("Save your private key securely:").font(.system(size: 12, weight: .semibold)).foregroundColor(AppColors.textSecondary).frame(maxWidth: .infinity, alignment: .leading)
-                                Text(key.privateKey).font(.system(size: 10, weight: .regular, design: .monospaced)).foregroundColor(AppColors.textPrimary).lineLimit(5).frame(maxWidth: .infinity, alignment: .leading).padding(8).background(AppColors.surface).cornerRadius(6)
+                                Text("Private Key (save securely):").font(.system(size: 12, weight: .semibold)).foregroundColor(AppColors.textSecondary).frame(maxWidth: .infinity, alignment: .leading)
+                                Text(key.privateKey).font(.system(size: 10, weight: .regular, design: .monospaced)).foregroundColor(AppColors.textPrimary).lineLimit(4).frame(maxWidth: .infinity, alignment: .leading).padding(8).background(AppColors.surface).cornerRadius(6)
                                 
                                 Button(action: { UIPasteboard.general.string = key.privateKey }) {
                                     HStack {
@@ -130,6 +133,77 @@ struct AuthView: View {
                 .presentationCornerRadius(16)
             }
         }
+        .sheet(isPresented: $showImportSheet) {
+            VStack(spacing: 16) {
+                HStack {
+                    Text("Import Access Key").font(.system(size: 18, weight: .semibold)).foregroundColor(AppColors.textPrimary)
+                    Spacer()
+                    Button(action: { showImportSheet = false }) {
+                        Image(systemName: "xmark.circle.fill").font(.system(size: 20)).foregroundColor(AppColors.textTertiary)
+                    }
+                }
+                .padding(16)
+                
+                ScrollView {
+                    VStack(spacing: 16) {
+                        VStack(spacing: 12) {
+                            Text("Key ID:").font(.system(size: 12, weight: .semibold)).foregroundColor(AppColors.textSecondary).frame(maxWidth: .infinity, alignment: .leading)
+                            TextField("Paste your Key ID", text: $importKeyId)
+                                .font(.system(size: 14, weight: .regular, design: .monospaced))
+                                .padding(12)
+                                .background(AppColors.surface)
+                                .cornerRadius(6)
+                        }
+                        
+                        VStack(spacing: 12) {
+                            Text("Private Key:").font(.system(size: 12, weight: .semibold)).foregroundColor(AppColors.textSecondary).frame(maxWidth: .infinity, alignment: .leading)
+                            TextEditor(text: $importPrivateKey)
+                                .font(.system(size: 12, weight: .regular, design: .monospaced))
+                                .padding(12)
+                                .background(AppColors.surface)
+                                .cornerRadius(6)
+                                .frame(height: 120)
+                        }
+                    }
+                    .padding(16)
+                }
+                .frame(maxHeight: .infinity)
+                
+                Button(action: {
+                    Task {
+                        await viewModel.importAccessKey(keyId: importKeyId, privateKey: importPrivateKey)
+                        if viewModel.errorMessage == nil {
+                            DispatchQueue.main.async {
+                                isAuthenticated = true
+                                showImportSheet = false
+                            }
+                        }
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill").font(.system(size: 16))
+                        Text("Import")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(AppColors.accent)
+                    .foregroundColor(AppColors.background)
+                    .font(.system(size: 14, weight: .semibold))
+                    .cornerRadius(8)
+                }
+                .padding(16)
+                
+                if let error = viewModel.errorMessage {
+                    Text(error)
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundColor(AppColors.error)
+                        .padding(.horizontal, 16)
+                }
+            }
+            .background(AppColors.background)
+            .presentationDetents([.height(500)])
+            .presentationCornerRadius(16)
+        }
     }
 }
 
@@ -145,10 +219,11 @@ class AccessKeyViewModel: ObservableObject {
         DispatchQueue.main.async { self.isLoading = true }
         
         do {
-            let (key, _) = try storageService.generateNewAccessKey()
+            let key = try await storageService.generateNewAccessKey()
             DispatchQueue.main.async {
                 self.generatedKey = key
                 self.isLoading = false
+                self.errorMessage = nil
             }
         } catch {
             DispatchQueue.main.async {
@@ -164,9 +239,43 @@ class AccessKeyViewModel: ObservableObject {
         do {
             try keychainService.saveAccessKey(key)
             storageService.setCurrentAccessKey(key)
+            DispatchQueue.main.async {
+                self.errorMessage = nil
+            }
         } catch {
             DispatchQueue.main.async {
                 self.errorMessage = "Failed to save key: \(error.localizedDescription)"
+            }
+        }
+    }
+    
+    func importAccessKey(keyId: String, privateKey: String) async {
+        guard !keyId.isEmpty, !privateKey.isEmpty else {
+            DispatchQueue.main.async {
+                self.errorMessage = "Key ID and Private Key are required"
+            }
+            return
+        }
+        
+        do {
+            let key = AccessKey(
+                keyId: keyId,
+                publicKey: "",
+                privateKey: privateKey,
+                createdAt: Date(),
+                permissions: ["read", "write", "delete"]
+            )
+            
+            try keychainService.saveAccessKey(key)
+            storageService.setCurrentAccessKey(key)
+            
+            DispatchQueue.main.async {
+                self.generatedKey = key
+                self.errorMessage = nil
+            }
+        } catch {
+            DispatchQueue.main.async {
+                self.errorMessage = "Failed to import key: \(error.localizedDescription)"
             }
         }
     }
